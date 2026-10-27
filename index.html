@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Poseidon Planning Poker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: cabeçalho fino, e abaixo uma mesa de votação (esquerda) com o painel de voto individual (direita). Dark-first, tema claro opcional. */
+:root {
+  --bg: #07102a;
+  --surface: #0e1a3a;
+  --surface-2: #14244d;
+  --line: #243769;
+  --fg: #e8eefc;
+  --muted: #94a5cc;
+  --accent: #26c9ea;
+  --accent-ink: #04202a;
+  --gold: #f5b53d;
+  --gold-ink: #2a1c02;
+  --ok: #34d399;
+  --bad: #fb7185;
+  --violet: #b4a1ff;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f2f6fc; --surface: #ffffff; --surface-2: #e8eff9; --line: #c9d6ec;
+    --fg: #0b1630; --muted: #4e6088; --accent: #0a86a3; --accent-ink: #ffffff;
+    --gold: #b9770e; --gold-ink: #ffffff; --ok: #0d8f64; --bad: #cc2f4a; --violet: #5b3fd0;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f2f6fc; --surface: #ffffff; --surface-2: #e8eff9; --line: #c9d6ec;
+  --fg: #0b1630; --muted: #4e6088; --accent: #0a86a3; --accent-ink: #ffffff;
+  --gold: #b9770e; --gold-ink: #ffffff; --ok: #0d8f64; --bad: #cc2f4a; --violet: #5b3fd0;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #07102a; --surface: #0e1a3a; --surface-2: #14244d; --line: #243769;
+  --fg: #e8eefc; --muted: #94a5cc; --accent: #26c9ea; --accent-ink: #04202a;
+  --gold: #f5b53d; --gold-ink: #2a1c02; --ok: #34d399; --bad: #fb7185; --violet: #b4a1ff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 40px;
+  min-height: 100%;
+}
+.wrap { max-width: 1120px; margin: 0 auto; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .5; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+/* top bar */
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; text-align: left; }
+.brand svg { width: 38px; height: 38px; border-radius: 50%; box-shadow: 0 0 0 2px var(--accent); }
+.brand b { font-family: var(--font-display); font-weight: 800; font-size: 19px; letter-spacing: .06em; display: block; line-height: 1.1; }
+.brand span { font-size: 12px; color: var(--muted); }
+.top .sp { flex: 1; }
+.chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.gold { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); font-weight: 600; }
+.btn.danger { color: var(--bad); }
+.btn.sm { padding: 4px 9px; font-size: 12px; }
+.btn.icon { padding: 7px 9px; }
+.room-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 6px 6px 12px; font-size: 13px; }
+.room-chip b { font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
+.count { background: var(--surface-2); border-radius: 99px; padding: 0 7px; font-size: 11px; font-family: var(--font-mono); }
+
+.banner { border: 1px solid var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--bg)); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
+.banner.err { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--bg)); }
+
+/* home */
+.home { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 40px; align-items: center; padding-top: 16px; }
+.hero h1 { font-weight: 800; font-size: clamp(32px, 5vw, 54px); line-height: 1.02; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p { color: var(--muted); max-width: 46ch; font-size: 15px; margin: 14px 0 0; }
+.hero .facts { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 22px; color: var(--muted); font-size: 13px; }
+.hero .facts span { display: inline-flex; align-items: center; gap: 6px; }
+.hero .facts i { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); display: inline-block; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+.field { display: grid; gap: 6px; margin-bottom: 14px; }
+.field label, .lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.in { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.in:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 500; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; text-align: center; cursor: pointer; background: var(--bg); }
+.seg input:checked + label { border-color: var(--accent); color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, var(--bg)); }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 4px 0 16px; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; color: var(--muted); font-weight: 600; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-color: var(--accent); }
+.check { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; }
+.check input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); }
+.check small { display: block; color: var(--muted); }
+.formerr { color: var(--bad); font-size: 13px; min-height: 18px; margin: 0 0 10px; }
+.full { width: 100%; justify-content: center; padding: 11px 14px; }
+.hello { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+
+/* room */
+.room-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.col { display: grid; gap: 20px; min-width: 0; }
+.story .row1 { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+.tag { font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+.story h2 { font-size: clamp(20px, 3vw, 28px); font-weight: 800; margin: 8px 0 4px; line-height: 1.15; overflow-wrap: anywhere; }
+.story .meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.story .meta a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.story .meta a:hover { text-decoration: underline; }
+.timer { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px; background: var(--bg); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.actions .grp { display: flex; gap: 8px; flex-wrap: wrap; }
+.empty { color: var(--muted); }
+.empty h2 { color: var(--fg); font-size: 20px; margin-bottom: 6px; }
+.table-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.table-head h3 { font-size: 16px; }
+.seats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 22px 12px; }
+.seat { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; min-width: 0; position: relative; }
+.card { position: relative; width: 78px; height: 104px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; border: 2px solid var(--line); color: var(--muted); transition: transform .2s; }
+.card.wait, .card.none { border-style: dashed; background: transparent; }
+.card.obs { border-style: dotted; background: transparent; }
+.card.sealed { border-color: var(--accent); color: var(--accent); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, var(--surface)) 0 6px, var(--surface) 6px 12px); }
+.card.sealed svg { background: var(--surface); border-radius: 50%; padding: 3px; width: 26px; height: 26px; }
+.card.shown { background: #f4f7fd; color: #0b1630; border-color: var(--accent); text-transform: none; letter-spacing: 0; transform: translateY(-3px); }
+.card.shown b { font-family: var(--font-mono); font-size: 26px; font-weight: 600; line-height: 1; }
+.card.shown small { font-size: 12px; color: #4e6088; }
+.card .flag { position: absolute; top: -9px; padding: 1px 7px; border-radius: 99px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.card .flag.lo { left: -6px; background: var(--gold); color: var(--gold-ink); }
+.card .flag.hi { right: -6px; background: var(--violet); color: var(--bg); }
+.who { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.av { width: 20px; height: 20px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; }
+.nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 92px; }
+.rl { font-size: 11px; color: var(--muted); }
+.rm { position: absolute; top: -6px; right: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 99px; font-size: 11px; padding: 0 7px; color: var(--muted); }
+.rm[data-armed] { color: var(--bad); border-color: var(--bad); }
+.stats { margin-top: 20px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 10px; background: var(--bg); text-align: center; }
+.stats div span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.stats div b { font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
+.stats .c-mean b, .stats .c-med b { color: var(--accent); }
+.stats .c-lo b { color: var(--gold); }
+.stats .c-hi b { color: var(--violet); }
+.pill { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; border: 1px solid; }
+.pill.ok { color: var(--ok); border-color: var(--ok); }
+.pill.mid { color: var(--gold); border-color: var(--gold); }
+.pill.bad { color: var(--bad); border-color: var(--bad); }
+.final { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
+.final h3 { font-size: 15px; }
+.final form { display: flex; gap: 8px; align-items: center; }
+.hours { position: relative; }
+.hours .in { padding-right: 30px; font-family: var(--font-mono); font-weight: 600; width: 112px; }
+.hours i { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--muted); font-size: 12px; }
+.vote h3 { font-size: 16px; margin-bottom: 4px; }
+.vote .note { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+.vote .big { font-size: 22px; padding: 12px 56px 12px 14px; width: 100%; }
+.vote .hours i { font-size: 13px; right: 14px; }
+.presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0 14px; }
+.presets button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 0; font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--muted); }
+.presets button:hover { color: var(--fg); border-color: var(--accent); }
+
+/* layers */
+.layer { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(3px); display: flex; justify-content: center; align-items: center; padding: 16px; }
+.layer.side { justify-content: flex-end; align-items: stretch; padding: 0; }
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; width: 100%; max-width: 560px; max-height: 92vh; overflow: auto; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+.layer.side .sheet { max-width: 440px; border-radius: 0; max-height: none; height: 100%; padding-top: max(20px, env(safe-area-inset-top, 0px)); padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
+.sheet.wide { max-width: 760px; }
+.sheet-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.sheet-h h3 { font-size: 18px; }
+.bl-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.bl { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+.bl.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--bg)); }
+.bl.hostable { cursor: pointer; }
+.bl .r1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.bl .id { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.bl h4 { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.st { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+.st.est { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--bg)); font-family: var(--font-mono); }
+.st.vot { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--bg)); }
+.bl .ctl { display: flex; gap: 4px; align-items: center; }
+.bl .ctl button { background: none; border: 0; padding: 2px 5px; color: var(--muted); font-size: 12px; }
+.bl .ctl button:hover { color: var(--accent); }
+.bl .ctl button.del:hover { color: var(--bad); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.total { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--bg); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.total b { font-family: var(--font-mono); font-size: 30px; font-weight: 600; color: var(--accent); }
+.tbl { overflow-x: auto; }
+.tbl table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.tbl td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl td.num, .tbl th.num { text-align: right; font-family: var(--font-mono); }
+textarea.in { resize: vertical; font-family: var(--font-mono); font-size: 13px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(20px, env(safe-area-inset-bottom, 0px)); z-index: 50; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+.toast.err { background: var(--bad); color: #fff; }
+
+@media (max-width: 860px) {
+  .home { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .room-grid { grid-template-columns: minmax(0, 1fr); }
+  .vote-col { order: -1; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+
+html { min-height: 100%; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+</style>
+
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="logo" viewBox="0 0 500 500">
+    <circle cx="250" cy="250" r="230" fill="#04091E"/>
+    <circle cx="250" cy="250" r="150" stroke="#00B4D8" stroke-width="16" fill="none"/>
+    <path d="M200 240 C 220 230, 280 230, 300 240 C 310 270, 315 310, 280 370 C 260 400, 240 400, 220 370 C 185 310, 190 270, 200 240 Z" fill="#9E7850"/>
+    <path d="M220 280 Q 250 290 280 280 Q 250 300 220 280" fill="#604226"/>
+    <path d="M225 310 Q 250 320 275 310 Q 250 328 225 310" fill="#604226"/>
+    <path d="M230 340 Q 250 348 270 340 Q 250 355 230 340" fill="#604226"/>
+    <path d="M 120 220 Q 160 210 200 240 Q 150 260 120 220" fill="#9E7850" stroke="#00B4D8" stroke-width="3"/>
+    <path d="M 300 240 C 350 210, 420 180, 470 120 C 440 160, 380 220, 300 260 Z" fill="#9E7850" stroke="#00B4D8" stroke-width="3"/>
+    <path d="M 220 200 Q 250 190 280 200 Q 270 230 250 240 Q 230 230 220 200 Z" fill="#D2B48C"/>
+    <path d="M 190 190 Q 220 150 250 165 Q 280 150 310 190 Q 280 175 250 180 Q 220 175 190 190" fill="#00B4D8"/>
+    <path d="M 200 180 C 220 140, 280 140, 300 180 C 270 160, 230 160, 200 180 Z" fill="#E2E8F0"/>
+    <path d="M 220 210 Q 200 250 230 280 Q 250 310 270 280 Q 300 250 280 210 Q 250 250 220 210 Z" fill="#FFFFFF"/>
+    <path d="M 235 215 Q 250 245 265 215 Q 250 235 235 215" fill="#CBD5E1"/>
+    <line x1="10" y1="310" x2="390" y2="100" stroke="#F59E0B" stroke-width="12" stroke-linecap="round"/>
+    <line x1="10" y1="310" x2="390" y2="100" stroke="#FCD34D" stroke-width="6" stroke-linecap="round"/>
+    <path d="M 370 110 L 420 70 L 400 100 L 430 90 L 405 115 L 435 130 L 390 125 Z" fill="#F59E0B" stroke="#FCD34D" stroke-width="2"/>
+    <polygon points="390,100 450,65 410,110" fill="#FCD34D"/>
+    <circle cx="250" cy="250" r="235" stroke="#00B4D8" stroke-width="6" stroke-opacity="0.6" fill="none"/>
+  </symbol>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <button class="brand" id="brandBtn" type="button" aria-label="Início">
+      <svg aria-hidden="true"><use href="#logo"/></svg>
+      <div><b>POSEIDON</b><span>Estimativa em horas para o time</span></div>
+    </button>
+    <div class="sp"></div>
+    <div class="chips" id="roomChips" hidden>
+      <span class="room-chip">Sala <b id="chipCode"></b>
+        <button class="btn sm" id="copyBtn" type="button">Copiar nome</button></span>
+      <button class="btn" id="blBtn" type="button">Backlog <span class="count" id="blCount">0</span></button>
+      <button class="btn" id="sumBtn" type="button">Resumo</button>
+      <button class="btn danger" id="leaveBtn" type="button">Sair</button>
+    </div>
+    <button class="btn icon" id="themeBtn" type="button" title="Alternar tema" aria-label="Alternar tema">◐</button>
+  </header>
+
+  <div class="banner err" id="connBanner" hidden></div>
+
+  <!-- HOME -->
+  <main id="home" class="home">
+    <section class="hero">
+      <h1>Quantas <em>horas</em> leva esse card?</h1>
+      <p>Cada pessoa estima em segredo. Quando o facilitador revela, todos veem os valores ao mesmo tempo, com média, mediana e quem votou menos e mais.</p>
+      <div class="facts">
+        <span><i></i>Votos ocultos até a revelação</span>
+        <span><i></i>Sala criada pelo nome</span>
+        <span><i></i>Resumo exportável em CSV</span>
+      </div>
+    </section>
+    <section class="panel" aria-label="Entrar">
+      <p class="formerr" id="homeErr" role="alert"></p>
+      <div class="field">
+        <label for="meName">Seu nome</label>
+        <input class="in" id="meName" maxlength="30" autocomplete="nickname" placeholder="Como o time te chama">
+      </div>
+      <div class="field">
+        <span class="lbl">Seu papel na votação</span>
+        <div class="seg">
+          <input type="radio" name="role" id="roleP" value="participant" checked><label for="roleP">Participante</label>
+          <input type="radio" name="role" id="roleO" value="observer"><label for="roleO">Observador</label>
+        </div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tabCreate" aria-selected="true">Criar sala</button>
+        <button type="button" role="tab" id="tabJoin" aria-selected="false">Entrar em uma sala</button>
+      </div>
+      <form id="createForm">
+        <div class="field">
+          <label for="roomName">Nome da sala</label>
+          <input class="in" id="roomName" maxlength="40" placeholder="Ex.: Sprint 42">
+        </div>
+        <label class="check"><input type="checkbox" id="autoReveal"><span>Revelar automaticamente<small>Mostra os votos assim que todos votarem.</small></span></label>
+        <button class="btn primary full" id="createBtn" type="submit" disabled>Criar e entrar</button>
+      </form>
+      <form id="joinForm" hidden>
+        <div class="field">
+          <label for="joinName">Nome da sala</label>
+          <input class="in" id="joinName" maxlength="40" placeholder="O nome que o facilitador passou">
+        </div>
+        <button class="btn primary full" id="joinBtn" type="submit" disabled>Entrar na sala</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ROOM -->
+  <main id="room" class="room-grid" hidden>
+    <div class="col">
+      <section class="panel story" id="storyPanel"></section>
+      <section class="panel">
+        <div class="table-head">
+          <h3>Mesa de votação</h3>
+          <span class="muted" id="voteCount"></span>
+        </div>
+        <ul class="seats" id="seats"></ul>
+        <div class="stats" id="stats" hidden></div>
+      </section>
+      <section class="panel final" id="finalBar" hidden>
+        <div><h3>Estimativa final</h3><span class="muted">Ajuste o valor combinado com o time e confirme.</span></div>
+        <form id="finalForm">
+          <div class="hours"><input class="in" id="finalInput" inputmode="decimal" aria-label="Horas finais" autocomplete="off"><i>h</i></div>
+          <button class="btn gold" type="submit" id="finalBtn">Confirmar</button>
+        </form>
+      </section>
+    </div>
+    <aside class="col vote-col">
+      <section class="panel vote">
+        <h3>Sua estimativa</h3>
+        <p class="note" id="voteNote"></p>
+        <form id="voteForm" autocomplete="off">
+          <label class="lbl" for="voteInput">Quantas horas você estima?</label>
+          <div class="hours" style="margin-top:6px"><input class="in big" id="voteInput" inputmode="decimal" placeholder="0,5" ><i>horas</i></div>
+          <div class="presets" id="presets"></div>
+          <button class="btn primary full" id="voteBtn" type="submit">Confirmar voto</button>
+        </form>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<!-- LAYERS -->
+<div class="layer side" id="blLayer" hidden>
+  <div class="sheet" role="dialog" aria-label="Backlog da sessão">
+    <div class="sheet-h"><h3>Backlog da sessão</h3><button class="btn sm" type="button" data-close>Fechar</button></div>
+    <div class="two" id="blHostBar">
+      <button class="btn" type="button" id="addStoryBtn">Nova história</button>
+      <button class="btn" type="button" id="bulkBtn">Importar lista</button>
+    </div>
+    <ul class="bl-list" id="blList"></ul>
+  </div>
+</div>
+
+<div class="layer" id="storyLayer" hidden>
+  <div class="sheet" role="dialog" aria-label="História">
+    <div class="sheet-h"><h3 id="storyH">Nova história</h3><button class="btn sm" type="button" data-close>Fechar</button></div>
+    <form id="storyForm">
+      <div class="field"><label for="stTitle">Título do card</label><input class="in" id="stTitle" maxlength="160" required placeholder="Ex.: Exportar relatório financeiro em CSV"></div>
+      <div class="field"><label for="stUrl">Link do card (opcional)</label><input class="in" id="stUrl" maxlength="400" placeholder="https://..."></div>
+      <p class="formerr" id="stErr" role="alert"></p>
+      <button class="btn primary full" type="submit">Salvar</button>
+    </form>
+  </div>
+</div>
+
+<div class="layer" id="bulkLayer" hidden>
+  <div class="sheet" role="dialog" aria-label="Importar histórias">
+    <div class="sheet-h"><h3>Importar lista</h3><button class="btn sm" type="button" data-close>Fechar</button></div>
+    <form id="bulkForm">
+      <div class="field"><label for="bulkText">Uma história por linha</label>
+        <textarea class="in" id="bulkText" rows="8" placeholder="Corrigir login com SSO&#10;Tela de permissões&#10;Relatório mensal em PDF"></textarea></div>
+      <button class="btn primary full" type="submit">Importar</button>
+    </form>
+  </div>
+</div>
+
+<div class="layer" id="sumLayer" hidden>
+  <div class="sheet wide" role="dialog" aria-label="Resumo da sessão">
+    <div class="sheet-h"><h3>Resumo da sessão</h3><button class="btn sm" type="button" data-close>Fechar</button></div>
+    <div class="total"><div><span class="lbl">Total estimado</span><div class="muted" id="sumCounts"></div></div><b id="sumTotal">0 h</b></div>
+    <div class="tbl"><table><thead><tr><th>ID</th><th>História</th><th class="num">Rodadas</th><th class="num">Horas finais</th></tr></thead><tbody id="sumBody"></tbody></table></div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn primary" id="csvBtn" type="button">Exportar CSV</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
